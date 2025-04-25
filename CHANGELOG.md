@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.0.0...v1.1.0) (2025-04-25)
+
+
+### Features
+
+* **pipeline:** add update of pipeline ([96eda3d](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/96eda3dfbd89249960e8326ddd52f4be0bee09e0))
+
 # 1.0.0 (2025-04-25)
 
 
