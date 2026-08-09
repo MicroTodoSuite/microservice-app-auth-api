@@ -18,6 +18,7 @@ jobs:
       service-name: auth-api
       language: go
       sonar-project-key: MicroTodoSuite_auth-api
+      sonar-host-url: ${{ vars.SONAR_HOST_URL }}
     secrets: inherit
 
   release:
