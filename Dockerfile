@@ -14,8 +14,10 @@ RUN go test ./... \
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6
 
 WORKDIR /app
-COPY --from=build --chown=nonroot:nonroot /out/auth-api /app/auth-api
+COPY --from=build --chown=65532:65532 /out/auth-api /app/auth-api
 
-USER nonroot:nonroot
+# Kubernetes can verify this numeric identity before starting a container with
+# runAsNonRoot. The distroless nonroot account maps to UID/GID 65532.
+USER 65532:65532
 EXPOSE 8000
 ENTRYPOINT ["/app/auth-api"]
