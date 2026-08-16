@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 var allowedUserHashes = map[string]interface{}{
@@ -56,10 +56,11 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 		return user, err
 	}
 	url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return user, err
+	}
 	req.Header.Add("Authorization", "Bearer "+token)
-
-	req = req.WithContext(ctx)
 
 	resp, err := h.Client.Do(req)
 	if err != nil {
@@ -67,7 +68,7 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 	}
 
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return user, err
 	}
