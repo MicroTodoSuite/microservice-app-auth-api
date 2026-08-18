@@ -1,0 +1,3 @@
+# Spectral ruleset for the auth-api OpenAPI contract (spec 007). Extends the
+# built-in OpenAPI rules; the contract gate fails on any error-level finding.
+extends: ["spectral:oas"]

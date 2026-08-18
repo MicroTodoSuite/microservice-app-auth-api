@@ -1,0 +1,105 @@
+openapi: 3.1.0
+info:
+  title: Auth API
+  version: 1.0.0
+  description: >
+    Authenticates a small set of credentials, fetches the matching profile from
+    the Users API, and returns a signed JWT. Contract-first source of truth
+    (spec 007 / T007).
+  contact:
+    name: MicroTodoSuite
+    url: https://github.com/MicroTodoSuite
+  license:
+    name: MIT
+servers:
+  - url: /
+    description: Environment-neutral; routed by the frontend proxy / ingress.
+paths:
+  /login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Exchange credentials for a signed JWT.
+      description: Validates the credentials, fetches the user profile, and returns a signed access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated; returns an access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Username or password is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /version:
+    get:
+      operationId: getVersion
+      tags: [meta]
+      description: Returns a human-readable banner identifying the service.
+      summary: Human-readable service version banner.
+      responses:
+        '200':
+          description: Version banner.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Auth API, written in Go\n"
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [observability]
+      description: Exposes Prometheus metrics in text format; no authentication required.
+      summary: Prometheus metrics exposition (public).
+      responses:
+        '200':
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+    LoginResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+          description: Signed JWT (HS256) carrying username/role claims.
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+tags:
+  - name: auth
+  - name: meta
+  - name: observability
