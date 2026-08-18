@@ -19,6 +19,8 @@ jobs:
       language: go
       sonar-project-key: MicroTodoSuite_auth-api
       sonar-host-url: ${{ vars.SONAR_HOST_URL }}
+      # Unit gate active: ci/unit.sh runs the Go suite + coverage (spec 006 T008).
+      run-unit: true
     secrets: inherit
 
   release:

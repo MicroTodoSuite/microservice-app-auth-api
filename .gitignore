@@ -1,6 +1,10 @@
 vendor
 auth-api
 
+# Coverage artifacts produced by ci/unit.sh (spec 006)
+coverage.out
+coverage.business.out
+
 
 ### Linux ###
 *~

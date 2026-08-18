@@ -1,19 +1,16 @@
 # Build stage. Pinned, not "latest": every build resolves the identical toolchain.
-FROM golang:1.23.4-bookworm AS build
+FROM golang:1.25-bookworm AS build
 
 WORKDIR /app
 
-COPY *.go ./
+# Committed go.mod/go.sum are the source of truth (spec 006 migrated auth-api off
+# `dep` to Go modules). Download deps in a cached layer before copying sources so
+# the build is reproducible and does not resolve "newest" at build time.
+COPY go.mod go.sum ./
+RUN go mod download
 
-ENV GO111MODULE=on
-# go mod tidy alone resolves the newest release of every dependency at build time,
-# which is not reproducible and breaks silently when a maintainer's newest release
-# needs a newer Go than the one pinned above (observed with client_golang >=1.25).
-# Pin the direct dependency that forces that requirement before tidy resolves the rest.
-RUN go mod init github.com/bortizf/microservice-app-example/tree/master/auth-api \
-    && go get github.com/prometheus/client_golang@v1.20.5 \
-    && go mod tidy \
-    && CGO_ENABLED=0 go build -o auth-api .
+COPY *.go ./
+RUN CGO_ENABLED=0 go build -o auth-api .
 
 # Runtime stage. Minimal Debian base, no Go toolchain: only what auth-api needs to run.
 FROM debian:bullseye-slim AS runtime

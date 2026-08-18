@@ -1,0 +1,14 @@
+# Trivy vulnerability exceptions (spec 006 / T002, FR-002).
+#
+# Only upstream-UNFIXABLE findings may be listed here, each as an explicit,
+# justified, time-bounded exception. Never add a fixable CVE to silence the
+# gate, and never lower the gate severity — remediate at the dependency/base
+# image instead. The image-scan gate runs with `ignore-unfixed: true`, so
+# unfixed findings do not block; entries here document accepted risk for audit.
+#
+# Format:
+#   CVE-XXXX-YYYYY  # <justification> — review-by: YYYY-MM-DD
+#
+# auth-api currently has ZERO exceptions: the migration to Go modules,
+# golang-jwt/jwt v5, Echo v4, and bumped x/crypto/x/net/x/text/grpc cleared all
+# HIGH/CRITICAL findings (fixable and unfixed). Keep this file empty of CVEs.
