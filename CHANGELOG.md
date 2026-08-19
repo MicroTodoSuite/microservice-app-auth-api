@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.1.0...v1.1.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* use numeric runtime identity ([a800b2d](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/a800b2dde337aadea3bf5bca8bb12a055dbcfc9c))
+
 # [1.1.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.0.0...v1.1.0) (2025-04-25)
 
 
