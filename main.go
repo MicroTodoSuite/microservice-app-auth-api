@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -14,6 +15,7 @@ import (
 	gommonlog "github.com/labstack/gommon/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 var (
@@ -24,6 +26,17 @@ var (
 			Help: "Total number of requests handled by the Auth API",
 		},
 		[]string{"method", "status"},
+	)
+
+	// Prometheus histogram for the golden-signal latency dashboard
+	// (infrastructure/prometheus/rules/golden-signals.yaml in gitops).
+	requestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "auth_api_request_duration_seconds",
+			Help:    "Duration of requests handled by the Auth API",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method"},
 	)
 )
 
@@ -41,6 +54,7 @@ var (
 func main() {
 	// Register Prometheus metrics
 	prometheus.MustRegister(requestCount)
+	prometheus.MustRegister(requestDuration)
 
 	// Retrieve configuration from environment variables
 	hostport := ":" + os.Getenv("AUTH_API_PORT")
@@ -66,13 +80,15 @@ func main() {
 	// Create a new Echo instance
 	e := echo.New()
 
-	// Middleware to count requests
+	// Middleware to count requests and record their duration
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			start := time.Now()
 			method := c.Request().Method
 			status := http.StatusOK
 			defer func() {
 				requestCount.WithLabelValues(method, fmt.Sprintf("%d", status)).Inc()
+				requestDuration.WithLabelValues(method).Observe(time.Since(start).Seconds())
 			}()
 			err := next(c)
 			if err != nil {
@@ -90,20 +106,21 @@ func main() {
 	// Set log level
 	e.Logger.SetLevel(gommonlog.INFO)
 
-	if zipkinURL := os.Getenv("ZIPKIN_URL"); len(zipkinURL) != 0 {
-		e.Logger.Infof("init tracing to Zipkit at %s", zipkinURL)
+	if otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); len(otlpEndpoint) != 0 {
+		e.Logger.Infof("init OpenTelemetry tracing to %s", otlpEndpoint)
 
-		if tracedMiddleware, tracedClient, err := initTracing(zipkinURL); err == nil {
-			e.Use(echo.WrapMiddleware(tracedMiddleware))
+		if shutdown, tracedClient, err := initTracing(context.Background()); err == nil {
+			e.Use(otelecho.Middleware("auth-api"))
 			userService.Client = tracedClient
+			defer shutdown(context.Background())
 		} else {
-			e.Logger.Infof("Zipkin tracer init failed: %s", err.Error())
+			e.Logger.Infof("OpenTelemetry tracer init failed: %s", err.Error())
 		}
 	} else {
-		e.Logger.Infof("Zipkin URL was not provided, tracing is not initialised")
+		e.Logger.Infof("OTEL_EXPORTER_OTLP_ENDPOINT was not provided, tracing is not initialised")
 	}
 
-	e.Use(middleware.Logger())
+	e.Use(requestLoggerMiddleware())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
 
@@ -118,6 +135,25 @@ func main() {
 	e.Logger.Fatal(e.Start(hostport))
 }
 
+// requestLoggerMiddleware replaces echo's default access-log middleware with
+// a structured JSON one carrying trace_id/span_id (see otel.go), so a log
+// line can be correlated back to its trace.
+func requestLoggerMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			start := time.Now()
+			err := next(c)
+			logWithTrace(c.Request().Context(), slog.LevelInfo, "http_request",
+				"method", c.Request().Method,
+				"path", c.Path(),
+				"status", c.Response().Status,
+				"duration_ms", time.Since(start).Milliseconds(),
+			)
+			return err
+		}
+	}
+}
+
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -125,18 +161,18 @@ type LoginRequest struct {
 
 func getLoginHandler(userService UserService) echo.HandlerFunc {
 	f := func(c echo.Context) error {
+		ctx := c.Request().Context()
 		requestData := LoginRequest{}
 		decoder := json.NewDecoder(c.Request().Body)
 		if err := decoder.Decode(&requestData); err != nil {
-			log.Printf("could not read credentials from POST body: %s", err.Error())
+			logWithTrace(ctx, slog.LevelError, "could not read credentials from POST body", "error", err.Error())
 			return ErrHttpGenericMessage
 		}
 
-		ctx := c.Request().Context()
 		user, err := userService.Login(ctx, requestData.Username, requestData.Password)
 		if err != nil {
 			if err != ErrWrongCredentials {
-				log.Printf("could not authorize user '%s': %s", requestData.Username, err.Error())
+				logWithTrace(ctx, slog.LevelError, "could not authorize user", "username", requestData.Username, "error", err.Error())
 				return ErrHttpGenericMessage
 			}
 
@@ -155,7 +191,7 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 		// Generate encoded token and send it as response.
 		t, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
-			log.Printf("could not generate a JWT token: %s", err.Error())
+			logWithTrace(ctx, slog.LevelError, "could not generate a JWT token", "error", err.Error())
 			return ErrHttpGenericMessage
 		}
 
