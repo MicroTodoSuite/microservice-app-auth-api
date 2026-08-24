@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.2.0...v1.2.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* remove invalid trailing comma in login json example ([#15](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/15)) ([1f4f7ad](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/1f4f7ad23596d55718be0b3262a263f19e31b06d))
+
 # [1.2.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.1.1...v1.2.0) (2026-08-24)
 
 
