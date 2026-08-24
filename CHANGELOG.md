@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.1.1...v1.2.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** publish images to the migrated AWS account ([5973e4f](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/5973e4f880b4ce2b0199bdc05fac898dc40ac432))
+
+
+### Features
+
+* replace Zipkin with OpenTelemetry tracing and add latency histogram ([6853820](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/6853820e8407fb334c9c2bdcaa71c4a2176da8f6))
+
 ## [1.1.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.1.0...v1.1.1) (2026-08-19)
 
 
