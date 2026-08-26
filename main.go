@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	gommonlog "github.com/labstack/gommon/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
@@ -52,10 +50,6 @@ var (
 )
 
 func main() {
-	// Register Prometheus metrics
-	prometheus.MustRegister(requestCount)
-	prometheus.MustRegister(requestDuration)
-
 	// Retrieve configuration from environment variables
 	hostport := ":" + os.Getenv("AUTH_API_PORT")
 	userAPIAddress := os.Getenv("USERS_API_ADDRESS")
@@ -66,9 +60,16 @@ func main() {
 		jwtSecret = envJwtSecret
 	}
 
-	// Initialize UserService with allowed user hashes
+	// Non-secret operational configuration, supplied by ConfigMap. Loaded
+	// before anything else so a bad value fails startup rather than surfacing
+	// as an odd timeout hours later.
+	cfg := loadRuntimeConfig()
+
+	// http.DefaultClient has no timeout. A users-api that accepts the
+	// connection and never answers would hang one goroutine per login until
+	// this pod exhausts memory, while liveness kept passing.
 	userService := UserService{
-		Client:         http.DefaultClient,
+		Client:         newResilientClient(cfg.Resilience),
 		UserAPIAddress: userAPIAddress,
 		AllowedUserHashes: map[string]interface{}{
 			"admin_admin": nil,
@@ -80,28 +81,13 @@ func main() {
 	// Create a new Echo instance
 	e := echo.New()
 
-	// Middleware to count requests and record their duration
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			start := time.Now()
-			method := c.Request().Method
-			status := http.StatusOK
-			defer func() {
-				requestCount.WithLabelValues(method, fmt.Sprintf("%d", status)).Inc()
-				requestDuration.WithLabelValues(method).Observe(time.Since(start).Seconds())
-			}()
-			err := next(c)
-			if err != nil {
-				if httpError, ok := err.(*echo.HTTPError); ok {
-					status = httpError.Code
-				}
-			}
-			return err
-		}
-	})
+	e.Use(metricsMiddleware())
 
-	// Route for Prometheus metrics
-	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+	// Health probes and Prometheus metrics. Registered before the auth
+	// middleware chain: a probe that needs a credential fails during exactly
+	// the incident it exists to report on.
+	health := newHealthState()
+	registerOperationalRoutes(e, health)
 
 	// Set log level
 	e.Logger.SetLevel(gommonlog.INFO)
@@ -120,6 +106,8 @@ func main() {
 		e.Logger.Infof("OTEL_EXPORTER_OTLP_ENDPOINT was not provided, tracing is not initialised")
 	}
 
+	// Ahead of the request logger, so every line it writes carries the id.
+	e.Use(correlationMiddleware())
 	e.Use(requestLoggerMiddleware())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
@@ -130,6 +118,8 @@ func main() {
 	})
 
 	e.POST("/login", getLoginHandler(userService))
+
+	e.Logger.Infof("runtime configuration: %s", marshalConfigForStartupLog(cfg))
 
 	// Start server
 	e.Logger.Fatal(e.Start(hostport))

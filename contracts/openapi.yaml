@@ -60,6 +60,61 @@ paths:
               schema:
                 type: string
               example: "Auth API, written in Go\n"
+  /health/startup:
+    get:
+      operationId: getStartupHealth
+      tags: [observability]
+      summary: Startup probe.
+      description: >-
+        Reports whether the process has finished starting. Kubernetes uses this
+        to hold off the liveness probe until initialisation completes, so a slow
+        start is not mistaken for a hang and restarted into a loop.
+      responses:
+        '200':
+          description: Startup complete.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+        '503':
+          description: Still starting.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+  /health/ready:
+    get:
+      operationId: getReadiness
+      tags: [observability]
+      summary: Readiness probe.
+      description: >-
+        Reports whether this pod should receive traffic right now. Failing this
+        removes the pod from the Service endpoints without restarting it, which
+        is what lets a pod drain connections cleanly.
+      responses:
+        '200':
+          description: Ready to serve.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+        '503':
+          description: Not ready to serve.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+  /health/live:
+    get:
+      operationId: getLiveness
+      tags: [observability]
+      summary: Liveness probe.
+      description: >-
+        Reports only whether the process is wedged. It deliberately does not
+        consult users-api: a dependency outage must not restart every auth-api
+        pod, which would turn a dependency incident into a full outage.
+      responses:
+        '200':
+          description: Process is live.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
   /metrics:
     get:
       operationId: getMetrics
@@ -75,6 +130,14 @@ paths:
                 type: string
 components:
   schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, starting, not-ready]
     LoginRequest:
       type: object
       additionalProperties: false
