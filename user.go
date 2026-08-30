@@ -62,6 +62,13 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
+	// Carry the caller's correlation id downstream. Without this the trail
+	// stops at auth-api and users-api logs an unattributable request, which is
+	// exactly the hop you need when a login fails intermittently.
+	if id := correlationIDFrom(ctx); id != "" {
+		req.Header.Set(correlationHeader, id)
+	}
+
 	resp, err := h.Client.Do(req)
 	if err != nil {
 		return user, err
