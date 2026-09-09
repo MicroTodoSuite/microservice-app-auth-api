@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.2.1...v1.3.0) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ci:** target replacement AWS account ([510ad0c](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/510ad0cc61b7ec505829fbf9b3eb22e60002f0c7))
+* **security:** update vulnerable Go dependencies ([d801538](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/d8015380ada8cf77facbd093e0739e6bf13c2064))
+
+
+### Features
+
+* **us3:** auth-api health, correlation, telemetry, and resilience contract ([#16](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/16)) ([ed0347d](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/ed0347d441a881e5aeb7f4f38a497d4baa70787c))
+
 ## [1.2.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.2.0...v1.2.1) (2026-08-24)
 
 
