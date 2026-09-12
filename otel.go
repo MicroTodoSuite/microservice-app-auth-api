@@ -5,6 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -17,8 +21,8 @@ import (
 )
 
 // initTracing wires the OpenTelemetry SDK to an OTLP/gRPC collector and
-// returns a shutdown func plus an HTTP client that propagates trace context
-// on outbound requests (the auth-api -> users-api call in user.go).
+// returns the tracer provider main passes to newTracingMiddleware and
+// newTracedClient. Shut the provider down on exit to flush batched spans.
 //
 // The exporter reads its target from the standard OTEL_EXPORTER_OTLP_ENDPOINT
 // environment variable itself (the OpenTelemetry SDK auto-configures from it);
@@ -27,10 +31,10 @@ import (
 // host:port, not the URL form OTEL_EXPORTER_OTLP_ENDPOINT is documented to
 // carry (verified live: passing the raw env value to WithEndpoint produced a
 // "parse url" warning from the gRPC dialer).
-func initTracing(ctx context.Context) (func(context.Context) error, *http.Client, error) {
+func initTracing(ctx context.Context) (*sdktrace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	res, err := sdkresource.New(ctx,
@@ -39,7 +43,7 @@ func initTracing(ctx context.Context) (func(context.Context) error, *http.Client
 		),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(
@@ -52,11 +56,32 @@ func initTracing(ctx context.Context) (func(context.Context) error, *http.Client
 		propagation.Baggage{},
 	))
 
-	tracedClient := &http.Client{
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
-	}
+	return tracerProvider, nil
+}
 
-	return tracerProvider.Shutdown, tracedClient, nil
+// newTracingMiddleware traces inbound requests, continuing an incoming W3C
+// traceparent. Probes and scrapes are skipped: they would bury every sign-in
+// trace under kubelet and Prometheus traffic.
+func newTracingMiddleware(provider trace.TracerProvider) echo.MiddlewareFunc {
+	return otelecho.Middleware("auth-api",
+		otelecho.WithTracerProvider(provider),
+		otelecho.WithSkipper(isProbeOrScrape),
+	)
+}
+
+func isProbeOrScrape(c echo.Context) bool {
+	path := c.Request().URL.Path
+	return path == "/metrics" || strings.HasPrefix(path, "/health/")
+}
+
+// newTracedClient wraps base's transport so each users-api call is a CLIENT
+// span that propagates its context. It copies base rather than replacing it,
+// so the timeout and retries of newResilientClient still apply; retries run
+// inside the one CLIENT span.
+func newTracedClient(provider trace.TracerProvider, base *http.Client) *http.Client {
+	traced := *base
+	traced.Transport = otelhttp.NewTransport(base.Transport, otelhttp.WithTracerProvider(provider))
+	return &traced
 }
 
 // structuredLogger is a minimal JSON logger correlated to the active span,

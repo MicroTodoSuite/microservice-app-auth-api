@@ -1,11 +1,11 @@
 ## Overview
 This Go service authenticates a small hardcoded set of credentials, retrieves the matching profile from the Users API, and returns a signed JWT.
-It also exposes version and Prometheus metrics endpoints and can trace inbound and outbound HTTP calls through Zipkin.
+It also exposes version and Prometheus metrics endpoints and, when an OTLP endpoint is configured, traces inbound requests and its Users API calls through OpenTelemetry.
 
 ## Stack
 - Go 1.18.2 is the tested language version documented in `README.md`; the Docker build instead uses the unpinned `golang:latest` image.
 - Echo 3.2.6 is the HTTP framework version resolved in `Gopkg.lock` from the 3.2.2 constraint in `Gopkg.toml`.
-- Runtime libraries include jwt-go 3.1.0, Zipkin Go at locked revision `3741243`, and an unpinned Prometheus Go client.
+- Runtime libraries include jwt-go 3.1.0, an unpinned Prometheus Go client, and the OpenTelemetry Go SDK with its `otelecho` and `otelhttp` instrumentation, versioned in `go.mod`.
 - Release automation uses Node.js 22 and semantic-release 24.2.3.
 
 ## Commands
@@ -25,7 +25,7 @@ It also exposes version and Prometheus metrics endpoints and can trace inbound a
 ## Structure
 - `main.go`: Echo setup, middleware, `/login`, `/version`, `/metrics`, and JWT issuance.
 - `user.go`: credential allowlist and authenticated HTTP lookup of `/users/{username}` in the Users API.
-- `tracing.go`: optional Zipkin server middleware and traced outbound HTTP client.
+- `otel.go`: OpenTelemetry tracer provider with an OTLP/gRPC exporter, the server middleware that skips `/health/*` and `/metrics`, and the traced Users API client that wraps the resilient client.
 - `Gopkg.toml` and `Gopkg.lock`: legacy Go `dep` constraints and resolved revisions.
 - `package.json`, `package-lock.json`, and `.releaserc`: semantic-release tooling; they are not application runtime files.
 - `Dockerfile`: builds the root Go package into `auth-api`; `.github/workflows/` builds, publishes, releases, and deploys the image.
@@ -45,7 +45,7 @@ It also exposes version and Prometheus metrics endpoints and can trace inbound a
 ## Notes for the Kubernetes migration
 - The server listens on `AUTH_API_PORT`; the documented local value is `8000`. The Dockerfile has no `EXPOSE`, and its comment incorrectly claims the entrypoint sets the port.
 - Required configuration is `AUTH_API_PORT` and `USERS_API_ADDRESS`. `JWT_SECRET` is optional in code but falls back to `myfancysecret`; provide it as a Kubernetes Secret shared with JWT-verifying services.
-- `ZIPKIN_URL` is optional. When set, it configures Zipkin reporting and tracing for the Users API client.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` is optional. When set, spans are exported over OTLP/gRPC to that collector with the service name `auth-api`; when unset, tracing is off.
 - The only runtime service dependency found is the Users API over HTTP at `${USERS_API_ADDRESS}/users/{username}`. No database or Redis dependency is present.
 - `/metrics` exposes Prometheus metrics and `/version` returns HTTP 200; there is no dedicated readiness or liveness endpoint.
 - Review the single-stage, root-running `golang:latest` image, dynamic `go mod init`/`go mod tidy`, missing dependency cache, unpinned Prometheus dependency, and absence of `EXPOSE` or `HEALTHCHECK`.
