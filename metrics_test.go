@@ -7,12 +7,14 @@ package main
 // target_info) may leak into the exposition.
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -143,6 +145,95 @@ func TestNoMetricIsRecordedThroughTheClientGolangAPI(t *testing.T) {
 		}
 		if constructor.Match(content) {
 			t.Errorf("%s records a metric through client_golang; spec 011 FR-001 requires the OpenTelemetry metrics API", source)
+		}
+	}
+}
+
+// --- business metrics (spec 011 T008) ----------------------------------------
+
+func signInCount(t *testing.T, outcome string) float64 {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	metricsHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	for _, line := range samples(rec.Body.String(), "auth_api_sign_ins_total") {
+		if labels(line)["outcome"] == outcome {
+			value, err := strconv.ParseFloat(line[strings.LastIndex(line, " ")+1:], 64)
+			if err != nil {
+				t.Fatalf("cannot parse %q: %v", line, err)
+			}
+			return value
+		}
+	}
+	return 0
+}
+
+func runLogin(t *testing.T, service UserService, password string) {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"admin","password":"`+password+`"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	_ = getLoginHandler(service)(e.NewContext(req, httptest.NewRecorder()))
+}
+
+func usersAPIReturningAdmin() UserService {
+	return UserService{
+		Client: httpDoerFunc(func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, `{"username":"admin","firstname":"Foo","lastname":"Bar","role":"admin"}`), nil
+		}),
+		UserAPIAddress:    "http://users-api",
+		AllowedUserHashes: map[string]interface{}{"admin_admin": nil},
+	}
+}
+
+func TestAcceptedSignInCountsOnce(t *testing.T) {
+	accepted, rejected := signInCount(t, "accepted"), signInCount(t, "rejected")
+	runLogin(t, usersAPIReturningAdmin(), "admin")
+	if got := signInCount(t, "accepted") - accepted; got != 1 {
+		t.Errorf("accepted sign-ins increased by %v, want 1", got)
+	}
+	if got := signInCount(t, "rejected") - rejected; got != 0 {
+		t.Errorf("rejected sign-ins increased by %v, want 0", got)
+	}
+}
+
+func TestRejectedSignInCountsOnce(t *testing.T) {
+	accepted, rejected := signInCount(t, "accepted"), signInCount(t, "rejected")
+	runLogin(t, usersAPIReturningAdmin(), "wrong")
+	if got := signInCount(t, "rejected") - rejected; got != 1 {
+		t.Errorf("rejected sign-ins increased by %v, want 1", got)
+	}
+	if got := signInCount(t, "accepted") - accepted; got != 0 {
+		t.Errorf("accepted sign-ins increased by %v, want 0", got)
+	}
+}
+
+func TestSignInFailingOnAServerErrorCountsNeitherOutcome(t *testing.T) {
+	accepted, rejected := signInCount(t, "accepted"), signInCount(t, "rejected")
+	unavailable := UserService{
+		Client: httpDoerFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("users-api unavailable")
+		}),
+		UserAPIAddress:    "http://users-api",
+		AllowedUserHashes: map[string]interface{}{"admin_admin": nil},
+	}
+	runLogin(t, unavailable, "admin")
+	if signInCount(t, "accepted") != accepted || signInCount(t, "rejected") != rejected {
+		t.Error("a sign-in failing on a server error must not count as accepted or rejected")
+	}
+}
+
+func TestSignInSeriesCarriesOnlyTheOutcomeLabel(t *testing.T) {
+	runLogin(t, usersAPIReturningAdmin(), "admin")
+	runLogin(t, usersAPIReturningAdmin(), "wrong")
+	rec := httptest.NewRecorder()
+	metricsHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	lines := samples(rec.Body.String(), "auth_api_sign_ins_total")
+	if len(lines) == 0 {
+		t.Fatal("auth_api_sign_ins_total is missing")
+	}
+	for _, line := range lines {
+		if got := labelNames(line); got != "outcome" {
+			t.Errorf("auth_api_sign_ins_total labels = %q, want outcome: %s", got, line)
 		}
 	}
 }
