@@ -1,3 +1,12 @@
+# [1.5.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.4.0...v1.5.0) (2026-09-13)
+
+
+### Features
+
+* **metrics:** count accepted and rejected sign-ins in auth-api ([2347344](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/23473444a6a45730e46aff65edcfd6d8ba42454f))
+* **metrics:** record auth-api metrics through opentelemetry ([4ce77cf](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/4ce77cf0de1872b78052a39b0083cccce164df17))
+* **metrics:** record auth-api metrics through opentelemetry ([#28](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/28)) ([e9c14b6](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/e9c14b6bdc182838f54dcc22d9a8b1836aeb405b)), closes [MicroTodoSuite/microservice-app-gitops#136](https://github.com/MicroTodoSuite/microservice-app-gitops/issues/136) [MicroTodoSuite/microservice-app-gitops#136](https://github.com/MicroTodoSuite/microservice-app-gitops/issues/136)
+
 # [1.4.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.3.0...v1.4.0) (2026-09-13)
 
 
