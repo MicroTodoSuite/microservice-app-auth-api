@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/attribute"
 	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -24,6 +26,7 @@ var (
 	metricsRegistry = prometheus.NewRegistry()
 	requestCount    metric.Int64Counter
 	requestDuration metric.Float64Histogram
+	signIns         metric.Int64Counter
 )
 
 func init() {
@@ -53,6 +56,24 @@ func init() {
 		metric.WithDescription("Duration of requests handled by the Auth API")); err != nil {
 		panic(err)
 	}
+	// Business metric (spec 011 FR-007, FR-008): one bounded outcome label and
+	// no user identity.
+	if signIns, err = meter.Int64Counter("auth_api_sign_ins",
+		metric.WithDescription("Sign-ins by outcome: accepted, or rejected for wrong credentials")); err != nil {
+		panic(err)
+	}
+}
+
+// Sign-in outcomes counted by recordSignIn. A sign-in that fails for any other
+// reason (a users-api or signing error) is not a rejected sign-in and is not
+// counted; it already shows in the error-rate golden signal.
+const (
+	signInAccepted = "accepted"
+	signInRejected = "rejected"
+)
+
+func recordSignIn(ctx context.Context, outcome string) {
+	signIns.Add(ctx, 1, metric.WithAttributes(attribute.String("outcome", outcome)))
 }
 
 // metricsHandler serves the exporter's registry.

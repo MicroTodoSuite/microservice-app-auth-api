@@ -143,6 +143,7 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 				return ErrHttpGenericMessage
 			}
 
+			recordSignIn(ctx, signInRejected)
 			return ErrWrongCredentials
 		}
 		token := jwt.New(jwt.SigningMethodHS256)
@@ -162,6 +163,7 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 			return ErrHttpGenericMessage
 		}
 
+		recordSignIn(ctx, signInAccepted)
 		return c.JSON(http.StatusOK, map[string]string{
 			"accessToken": t,
 		})
