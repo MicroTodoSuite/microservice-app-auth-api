@@ -5,7 +5,7 @@ It also exposes version and Prometheus metrics endpoints and, when an OTLP endpo
 ## Stack
 - Go 1.18.2 is the tested language version documented in `README.md`; the Docker build instead uses the unpinned `golang:latest` image.
 - Echo 3.2.6 is the HTTP framework version resolved in `Gopkg.lock` from the 3.2.2 constraint in `Gopkg.toml`.
-- Runtime libraries include jwt-go 3.1.0, an unpinned Prometheus Go client, and the OpenTelemetry Go SDK with its `otelecho` and `otelhttp` instrumentation, versioned in `go.mod`.
+- Runtime libraries include jwt-go 3.1.0, and the OpenTelemetry Go SDK with its `otelecho` and `otelhttp` tracing instrumentation and its metrics SDK and Prometheus exporter (the Prometheus Go client only serves that exporter's registry), versioned in `go.mod`.
 - Release automation uses Node.js 22 and semantic-release 24.2.3.
 
 ## Commands
@@ -25,6 +25,7 @@ It also exposes version and Prometheus metrics endpoints and, when an OTLP endpo
 ## Structure
 - `main.go`: Echo setup, middleware, `/login`, `/version`, `/metrics`, and JWT issuance.
 - `user.go`: credential allowlist and authenticated HTTP lookup of `/users/{username}` in the Users API.
+- `metrics.go`: OpenTelemetry meter provider whose Prometheus exporter writes the request counter and duration histogram, under their existing series names, into the registry `/metrics` serves.
 - `otel.go`: OpenTelemetry tracer provider with an OTLP/gRPC exporter, the server middleware that skips `/health/*` and `/metrics`, and the traced Users API client that wraps the resilient client.
 - `Gopkg.toml` and `Gopkg.lock`: legacy Go `dep` constraints and resolved revisions.
 - `package.json`, `package-lock.json`, and `.releaserc`: semantic-release tooling; they are not application runtime files.

@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // correlationHeader is the id a caller may supply and that this service
@@ -73,18 +73,7 @@ func (h *healthState) snapshot() (started bool, ready bool) {
 // probes. They are deliberately outside any authentication middleware: a
 // probe that needs a credential fails during exactly the incident it exists to
 // report on.
-// registerMetrics is idempotent. The collectors are registered here rather
-// than in main() so /metrics answers with the real series in any process that
-// mounts these routes — a test binary included. Registering twice panics, which
-// is why this is guarded rather than simply called from both places.
-var registerMetrics = sync.OnceFunc(func() {
-	prometheus.MustRegister(requestCount)
-	prometheus.MustRegister(requestDuration)
-})
-
 func registerOperationalRoutes(e *echo.Echo, state *healthState) {
-	registerMetrics()
-
 	e.GET("/health/startup", func(c echo.Context) error {
 		started, _ := state.snapshot()
 		if !started {
@@ -110,7 +99,7 @@ func registerOperationalRoutes(e *echo.Echo, state *healthState) {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+	e.GET("/metrics", echo.WrapHandler(metricsHandler()))
 }
 
 // metricsMiddleware records the golden signals under the exact series names the
@@ -126,8 +115,12 @@ func metricsMiddleware() echo.MiddlewareFunc {
 			status := http.StatusOK
 
 			defer func() {
-				requestCount.WithLabelValues(method, strconv.Itoa(status)).Inc()
-				requestDuration.WithLabelValues(method).Observe(time.Since(start).Seconds())
+				ctx := c.Request().Context()
+				requestCount.Add(ctx, 1, metric.WithAttributes(
+					attribute.String("method", method),
+					attribute.String("status", strconv.Itoa(status)),
+				))
+				requestDuration.Record(ctx, time.Since(start).Seconds(), metric.WithAttributes(attribute.String("method", method)))
 			}()
 
 			err := next(c)
