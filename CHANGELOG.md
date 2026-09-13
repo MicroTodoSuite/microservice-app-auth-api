@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.3.0...v1.4.0) (2026-09-13)
+
+
+### Features
+
+* **tracing:** trace auth-api sign-ins without tracing probes or losing the resilient client ([#26](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/26)) ([ec7ab2a](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/ec7ab2aa0df6b63441cdc723db6e272b42a1ea75)), closes [#123](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/123)
+
 # [1.3.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.2.1...v1.3.0) (2026-09-09)
 
 
