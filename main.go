@@ -12,29 +12,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	gommonlog "github.com/labstack/gommon/log"
-	"github.com/prometheus/client_golang/prometheus"
-)
-
-var (
-	// Prometheus counter for tracking the number of requests handled by the Auth API
-	requestCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "auth_api_requests_total",
-			Help: "Total number of requests handled by the Auth API",
-		},
-		[]string{"method", "status"},
-	)
-
-	// Prometheus histogram for the golden-signal latency dashboard
-	// (infrastructure/prometheus/rules/golden-signals.yaml in gitops).
-	requestDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "auth_api_request_duration_seconds",
-			Help:    "Duration of requests handled by the Auth API",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method"},
-	)
 )
 
 var (
@@ -166,6 +143,7 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 				return ErrHttpGenericMessage
 			}
 
+			recordSignIn(ctx, signInRejected)
 			return ErrWrongCredentials
 		}
 		token := jwt.New(jwt.SigningMethodHS256)
@@ -185,6 +163,7 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 			return ErrHttpGenericMessage
 		}
 
+		recordSignIn(ctx, signInAccepted)
 		return c.JSON(http.StatusOK, map[string]string{
 			"accessToken": t,
 		})
