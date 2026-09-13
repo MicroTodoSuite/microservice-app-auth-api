@@ -13,7 +13,6 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	gommonlog "github.com/labstack/gommon/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 var (
@@ -68,8 +67,9 @@ func main() {
 	// http.DefaultClient has no timeout. A users-api that accepts the
 	// connection and never answers would hang one goroutine per login until
 	// this pod exhausts memory, while liveness kept passing.
+	usersAPIClient := newResilientClient(cfg.Resilience)
 	userService := UserService{
-		Client:         newResilientClient(cfg.Resilience),
+		Client:         usersAPIClient,
 		UserAPIAddress: userAPIAddress,
 		AllowedUserHashes: map[string]interface{}{
 			"admin_admin": nil,
@@ -95,10 +95,10 @@ func main() {
 	if otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); len(otlpEndpoint) != 0 {
 		e.Logger.Infof("init OpenTelemetry tracing to %s", otlpEndpoint)
 
-		if shutdown, tracedClient, err := initTracing(context.Background()); err == nil {
-			e.Use(otelecho.Middleware("auth-api"))
-			userService.Client = tracedClient
-			defer shutdown(context.Background())
+		if provider, err := initTracing(context.Background()); err == nil {
+			e.Use(newTracingMiddleware(provider))
+			userService.Client = newTracedClient(provider, usersAPIClient)
+			defer provider.Shutdown(context.Background())
 		} else {
 			e.Logger.Infof("OpenTelemetry tracer init failed: %s", err.Error())
 		}
