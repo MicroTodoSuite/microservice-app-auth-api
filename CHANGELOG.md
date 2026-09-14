@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.5.0...v1.5.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **ci:** repoint to the latest .github reusable workflow refs ([#30](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/30)) ([52f4fdf](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/52f4fdff5ed4601f09d8b8ae8f14be98f1c138f0)), closes [#142](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/142) [#19](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/19)
+
 # [1.5.0](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.4.0...v1.5.0) (2026-09-13)
 
 
