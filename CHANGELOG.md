@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.5.1...v1.5.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **ci:** pin the promotion workflow past the conventions repair ([#33](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/33)) ([e483f05](https://github.com/MicroTodoSuite/microservice-app-auth-api/commit/e483f0511f3f25fb62b54b9a78081d0774c8aaba)), closes [#191](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/191) [#192](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/192) [#193](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/193) [#195](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/195) [#196](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/196) [#198](https://github.com/MicroTodoSuite/microservice-app-auth-api/issues/198) [MicroTodoSuite/microservice-app-gitops#205](https://github.com/MicroTodoSuite/microservice-app-gitops/issues/205)
+
 ## [1.5.1](https://github.com/MicroTodoSuite/microservice-app-auth-api/compare/v1.5.0...v1.5.1) (2026-09-14)
 
 
